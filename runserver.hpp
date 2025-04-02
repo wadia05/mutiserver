@@ -1,0 +1,45 @@
+# pragma once
+
+#include "main.hpp"
+class Connection;  // Forward declaration
+class Server;
+class Config;
+
+class Run {
+
+    private :
+        int epoll_fd;
+        std::vector<Config> configs;
+        std::vector<Server *> servers;
+        std::vector<std::map<int, Connection *> > connections;
+        size_t currIndexServer;
+    
+    public :
+        Run(char **av);
+        ~Run();
+        void createServer();
+        void setnon_blocking(int fd);
+        void add_to_epoll(int fd, uint32_t events);
+        void mod_epoll(int fd, uint32_t events);
+        void remove_from_epoll(int fd);
+        void printrunservers();
+        void runServer();
+        // bool is_new_connection(int fd);
+//         void run();
+//         void closeServer();
+//         void closeConnection();
+        void handleRequest(Connection *conn);
+        bool handleConnection(int fd, int j);
+        void readRequest(Connection *conn);
+        void parseRequest(Connection *conn);
+        void possessRequest(Connection *conn, HTTPRequest &request);
+        void sendResponse(Connection *conn);
+
+        void close_connection(Connection *conn);
+
+
+        int GET_hander(Connection *conn, HTTPRequest &request);
+        int POST_hander(Connection *conn);
+        int DELETE_hander(Connection *conn, HTTPRequest &request);
+
+};

@@ -1,0 +1,17 @@
+[32m0[0m
+New connection accepted
+GET request
+Parsing the request
+[35mSending the response[0m
+[32mClient connection reset[0m
+GET request
+Parsing the request
+[35mSending the response[0m
+[32mClient connection reset[0m
+Extracted Content-Length: 307967
+Extracted Content-Length: 307967
+Total received: 308606
+POST request
+Parsing the request
+[35mSending the response[0m
+[32mClient connection reset[0m
