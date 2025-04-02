@@ -102,7 +102,10 @@ void Run::readRequest(Connection *conn)
         std::cerr << "No socket available" << std::endl;
         return;
     }
-
+    if (!conn){
+        std::cerr << "Connection object is NULL" << std::endl;
+        return;
+    }
     char buffer[BUFFER_SIZE];
     int read_bytes = recv(conn->fd, buffer, sizeof(buffer), MSG_NOSIGNAL);
 
@@ -202,14 +205,11 @@ void Run::possessRequest(Connection *conn, HTTPRequest &request)
 void Run::parseRequest(Connection *conn)
 {
     HTTPRequest request;
-    if (currIndexServer >= servers.size() || currIndexServer >= configs.size()) {
-        std::cout << currIndexServer << std::endl;
-        std::cout << servers.size() << std::endl;
-        std::cout << configs.size() << std::endl;
-        std::cout << "Error: Invalid server or config index" << std::endl;
-        conn->status_code = 500;
-    }
-    else if (!request.parse_request(conn->read_buffer,configs[servers[this->currIndexServer]->getconnfig_index()])) {
+    int confidx = this->servers[this->currIndexServer]->getconnfig_index();
+    std::cout <<"config size : " <<this->configs.size() << std::endl;
+
+    std::cout << "Config index: " << confidx << std::endl;
+    if (!request.parse_request(conn->read_buffer,configs[confidx])) {
         std::cout << "Failed to parse request" << std::endl;
         // std::cout << "Request: " << conn->read_buffer << std::endl;
         conn->write_buffer.clear();
@@ -222,7 +222,7 @@ void Run::parseRequest(Connection *conn)
     {
         CGI cgi;
         int i = 0;
-        bool is_upload = cgi.upload(request, this->configs[this->currIndexServer]);
+        bool is_upload = cgi.upload(request, this->configs[confidx]);
         if (!is_upload && cgi.getStatus() != 200)
         {
             conn->status_code = cgi.getStatus();
@@ -230,7 +230,7 @@ void Run::parseRequest(Connection *conn)
         }
         else if (is_upload)
             i = 1;
-        if (cgi.is_cgi(request.getPath(), this->configs[this->currIndexServer], request.getInLocation()) && i == 0)
+        if (cgi.is_cgi(request.getPath(), this->configs[confidx], request.getInLocation()) && i == 0)
         {
             if (!cgi.exec_cgi(request, conn->response))
                 conn->status_code = cgi.getStatus();
@@ -260,7 +260,7 @@ void Run::handleRequest(Connection *conn)
     {
         this->readRequest(conn);
         conn->last_active = time(0);
-        std::cout << "Read request: " << conn->read_buffer << std::endl;
+        // std::cout << "Read request: " << conn->read_buffer << std::endl;
     }
     else if (conn->state == Connection::POSSESSING)
     {
@@ -307,6 +307,30 @@ void Run::runServer()
                         handleRequest(it->second);
                     }
                
+                }
+            }
+              // Handle keep-alive timeouts safely
+            time_t current_time = time(0);
+            // std::cout << "Current time: " << current_time << std::endl;
+            std::vector<int> expired_fds;
+            std::map<int, Connection *>::iterator it;
+            for (it = this->connections[this->currIndexServer].begin(); it != this->connections[this->currIndexServer].end(); ++it)
+            {
+                // std::cout << "Checking connection: " << it->first << " with last active: " << it->second->last_active << std::endl;
+                if (current_time - it->second->last_active > KEEP_ALIVE_TIMEOUT)
+                {
+                    expired_fds.push_back(it->first);
+                }
+            }
+
+
+            for (size_t i = 0; i < expired_fds.size(); ++i)
+            {
+                std::map<int, Connection *>::iterator it = this->connections[this->currIndexServer].find(expired_fds[i]);
+                if (it != this->connections[this->currIndexServer].end())
+                {
+                    // std::cout << "from timeout : " << it->first << std::endl;
+                    close_connection(it->second);
                 }
             }
 
@@ -490,9 +514,10 @@ void Run::close_connection(Connection *conn)
     {
         this->connections[i].erase(fd);
     }
-
+    
     // Delete connection object
     delete conn;
+    conn = NULL;
 }
 
 
