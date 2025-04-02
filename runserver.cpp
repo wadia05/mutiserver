@@ -35,9 +35,48 @@ Run::Run(char **av)
     this->connections.resize(servers.size());
     this->createServer();
 }
+#include <fstream>
 
+void test_dir(std::string path)
+{
+    std::ofstream htmlFile("file_list.html");
+    if (!htmlFile)
+    {
+        throw std::runtime_error("Failed to create HTML file");
+    }
+
+    htmlFile << "<html><body>\n";
+    htmlFile << "<h1>Files and Directories in " << path << "</h1>\n";
+
+    DIR *dir;
+    struct dirent *entry;
+
+    dir = opendir(path.c_str());
+    if (dir == NULL)
+    {
+        throw std::runtime_error("Failed to open directory");
+    }
+  
+    while ((entry = readdir(dir)) != NULL)
+    {
+        if (entry->d_type == DT_DIR)
+        {
+            htmlFile << "<a href=\"" << entry->d_name << "\">" << entry->d_name << "</a><br>\n";
+        }
+        else if (entry->d_type == DT_REG)
+        {
+            htmlFile << "<a href=\"" << entry->d_name << "\">" << entry->d_name << "</a><br>\n";
+        }
+    }
+
+    closedir(dir);
+
+    htmlFile << "</body></html>\n";
+    htmlFile.close();
+}
 void Run::createServer()
 {
+    test_dir("www/suss");
     for (size_t i = 0; i < servers.size(); i++)
     {
          // Create server socket
@@ -202,14 +241,20 @@ void Run::possessRequest(Connection *conn, HTTPRequest &request)
     conn->GetStateFilePath();
     conn->state = Connection::WRITING;
 }
+
+
+
+
 void Run::parseRequest(Connection *conn)
 {
     HTTPRequest request;
     int confidx = this->servers[this->currIndexServer]->getconnfig_index();
-    std::cout <<"config size : " <<this->configs.size() << std::endl;
+    // std::cout <<"config size : " <<this->configs.size() << std::endl;
 
-    std::cout << "Config index: " << confidx << std::endl;
+    // std::cout << "Config index: " << confidx << std::endl;
     if (!request.parse_request(conn->read_buffer,configs[confidx])) {
+
+        
         std::cout << "Failed to parse request" << std::endl;
         // std::cout << "Request: " << conn->read_buffer << std::endl;
         conn->write_buffer.clear();
@@ -235,17 +280,7 @@ void Run::parseRequest(Connection *conn)
             if (!cgi.exec_cgi(request, conn->response))
                 conn->status_code = cgi.getStatus();
         }
-        // else
-        // {
-        //     std::string file_content = read_file(std::string(request.getPath()));
-        //     if (file_content.empty())
-        //     {
-        //         print_message("Error reading file", RED);
-        //         conn->status_code  = 404;
-        //     }
-        //     else
-        //     conn->response = file_content;
-        // }
+
     }
     conn->read_buffer.clear();
     setReqType(conn, request);
