@@ -13,6 +13,7 @@ std::string HTTPRequest::getInLocation() const { return in_location; }
 bool HTTPRequest::hasHeader(const std::string &name) const { return headers.find(name) != headers.end(); }
 int HTTPRequest::getStatusCode() const { return status; }
 bool HTTPRequest::isRedirect() const { return is_redirect; }
+std::string HTTPRequest::getLocationRedirect() const { return location_redirect; }
 std::string HTTPRequest::getHeader(const std::string &name) const
 {
     std::map<std::string, std::string>::const_iterator it = headers.find(name);

@@ -47,7 +47,6 @@ std::string int_to_string(int num)
     return ss.str();
 }
 
-
 void CGI::set_env(const HTTPRequest &request)
 {
     env.clear();
@@ -105,6 +104,7 @@ char **create_env(const std::vector<cgi_env> &env)
     envp[env.size()] = NULL;
     return envp;
 }
+
 void cleanup_pipes(int *fd_in, int *fd_out)
 {
     if (fd_in[0] != -1)
@@ -116,10 +116,9 @@ void cleanup_pipes(int *fd_in, int *fd_out)
     if (fd_out[1] != -1)
         close(fd_out[1]);
 }
+
 bool CGI::exec_cgi(const HTTPRequest &request, std::string &response)
 {
-
-
     set_env(request);
     const std::string &script_path = request.getPath();
     if (access(script_path.c_str(), F_OK) == -1)

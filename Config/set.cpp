@@ -123,6 +123,18 @@ void Config::setDefaultRoot(std::vector<t_token> &tokens, int *i)
         *i = 1;
         return;
     }
+    if (tokens[0].value.empty())
+    {
+        print_message("Error: Invalid default_root - path cannot be empty", RED);
+        *i = 1;
+        return;
+    }
+    if (tokens[0].value[tokens[0].value.size() - 1] != '/')
+    {
+        print_message("Error: Invalid default_root - path must end with '/'", RED);
+        *i = 1;
+        return;
+    }
     std::string &path = tokens[0].value;
     if (!isValidPath(path, true))
     {
@@ -235,6 +247,8 @@ void Config::Location::setReturn(std::vector<t_token> &tokens, int *i)
 
 void Config::Location::setRoot(std::vector<t_token> &tokens, int *i)
 {
+    // chould end whit /
+
     if (tokens.size() != 1)
     {
         print_message("Error: Invalid root - expected exactly one path", RED);
@@ -242,6 +256,18 @@ void Config::Location::setRoot(std::vector<t_token> &tokens, int *i)
         return;
     }
     std::string &path = tokens[0].value;
+    if (path.empty())
+    {
+        print_message("Error: Invalid root - path cannot be empty", RED);
+        *i = 1;
+        return;
+    }
+    if (path[path.size() - 1] != '/')
+    {
+        print_message("Error: Invalid root - path must end with '/'", RED);
+        *i = 1;
+        return;
+    }
     if (!isValidPath(path, true))
     {
         print_message("Error: Invalid root path - path must exist and be accessible", RED);
@@ -326,11 +352,12 @@ void Config::Location::setCgi(std::vector<t_token> &tokens, int *i)
 
 void Config::Location::setPath(std::string path, int *i)
 {
-    if (path.empty() || path[path.size() - 1] != '/')
+    if (path.empty() || path[path.size() - 1] != '/' || (path[0] != '/' && *i != 2))
     {
-        print_message("Error: Invalid location path - must end with '/'", RED);
+        print_message("Error: Invalid location path - must start with '/' and end with '/'", RED);
         *i = 1;
         return;
     }
     this->path = path;
 }
+void Config::Location::setOldPath(const std::string &path) { old_path = path; }

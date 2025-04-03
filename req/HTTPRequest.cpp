@@ -3,12 +3,15 @@
 bool HTTPRequest::parse_request(const std::string &request, const Config &config)
 {
     this->status = 200;
+    std::cout << BLUE << "Parsing request" << RESET << std::endl;
     std::istringstream iss(request);
     std::string line;
     if (!std::getline(iss, line))
         return (print_message("Error reading request", RED), status = 400, false);
     if (!parseRequestLine(line, config))
         return false;
+    if (is_redirect == true)
+        return true;
     while (std::getline(iss, line) && !line.empty() && line != "\r")
     {
         trim(line);

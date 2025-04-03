@@ -19,7 +19,7 @@ Run::Run(char **av)
             server->setServerName(configs[i].getServerName()[0]);
             server->setServerIp(configs[i].getHost()[0]);
             server->setuploadSize(configs[i].getClientMaxBodySize()[0]);
-            server->setroot(configs[i].getDefaultRoot()[0]);
+            // server->setroot(configs[i].getDefaultRoot()[0]);
             server->setconnfig_index(i);
             std::cout << "here " << server[i].getconnfig_index() << std::endl;
             servers.push_back(server);
@@ -198,7 +198,7 @@ void Run::readRequest(Connection *conn)
         conn->state = Connection::POSSESSING;
         conn->keep_alive = false; // Disable keep-alive for this request
         mod_epoll(conn->fd, EPOLLOUT);
-        std::cout << "Extracted Content-Length: " << conn->content_length << std::endl;
+        // std::cout << "Extracted Content-Length: " << conn->content_length << std::endl;
         std::cout << "Total received: " << conn->total_received << std::endl;
     }else if (conn->content_length == 0) {
         conn->state = Connection::POSSESSING;
@@ -246,9 +246,6 @@ void Run::possessRequest(Connection *conn, HTTPRequest &request)
     conn->state = Connection::WRITING;
 }
 
-
-
-
 void Run::parseRequest(Connection *conn)
 {
     HTTPRequest request;
@@ -269,6 +266,16 @@ void Run::parseRequest(Connection *conn)
     }
     else
     {
+        if (request.isRedirect())
+        {
+            conn->is_redection = true;
+            conn->status_code = request.getStatusCode();
+            conn->response = request.getLocationRedirect();
+            std::cout << "test: " << request.getLocationRedirect() << std::endl;
+            conn->GetStateFilePath();
+            conn->state = Connection::WRITING;
+            return;
+        }
         CGI cgi;
         int i = 0;
         bool is_upload = cgi.upload(request, this->configs[confidx]);
@@ -279,10 +286,24 @@ void Run::parseRequest(Connection *conn)
         }
         else if (is_upload)
             i = 1;
+        // std::cout << RED << request.getPath() << RESET << std::endl;
         if (cgi.is_cgi(request.getPath(), this->configs[confidx], request.getInLocation()) && i == 0)
         {
+        // std::cout << RED << request.getPath() << RESET << std::endl;
+
             if (!cgi.exec_cgi(request, conn->response))
+            {
+
                 conn->status_code = cgi.getStatus();
+            }
+            else
+            {
+                conn->is_cgi = true;
+                conn->status_code = cgi.getStatus();
+                // std::cout << "CGI response: " << conn->response << std::endl;
+            }
+        // std::cout << RED << request.getPath() << RESET << std::endl;
+            // std::cout << BLUE << conn->response << RESET << std::endl;
         }
 
     }
@@ -532,6 +553,7 @@ void Run::sendResponse(Connection *conn)
         std::streamsize bytes_read = conn->readFormFile->gcount();
         conn->write_buffer.append(buffer, bytes_read);
     }
+
 
     ssize_t sent = send(conn->fd, conn->write_buffer.c_str(), conn->write_buffer.size(), MSG_NOSIGNAL);
     if (sent < 0) {

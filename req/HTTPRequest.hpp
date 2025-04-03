@@ -30,6 +30,7 @@ private:
     std::string content_type;
     std::string in_location;
     bool is_redirect;
+    std::string location_redirect;
     int status;
 
 public:
@@ -51,6 +52,7 @@ public:
     std::string getHttpVersion() const;
     int getStatusCode() const;
     bool isRedirect() const;
+    std::string getLocationRedirect() const;
     const std::map<std::string, std::string> &getQueryParams() const;
     const std::map<std::string, std::string> &getHeaders() const;
     const std::vector<BodyPart> &getBodyParts() const;

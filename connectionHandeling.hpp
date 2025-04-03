@@ -37,6 +37,8 @@ class Connection
 
     int fd;
     int status_code;
+    bool is_redection;
+
 
     std::string read_buffer;
     std::string write_buffer;

@@ -63,6 +63,7 @@ public:
         std::vector<std::string> allow_methods;
         std::map<int, std::string> return_;
         std::map<std::string, std::string> cgi;
+        std::string old_path;
 
     public:
         Location() {};
@@ -74,8 +75,10 @@ public:
         void setAllowMethods(std::vector<t_token> &tokens, int *i);
         void setReturn(std::vector<t_token> &tokens, int *i);
         void setCgi(std::vector<t_token> &tokens, int *i);
+        void setOldPath(const std::string &path); 
 
         std::string getPath() const;
+        std::string getOldPath() const;
         std::vector<std::string> getRoot() const;
         std::vector<std::string> getUploadDir() const;
         std::vector<std::string> getAutoindex() const;

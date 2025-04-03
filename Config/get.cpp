@@ -80,6 +80,7 @@ std::vector<std::string> Config::Location::getIndex() const { return index; }
 std::vector<std::string> Config::Location::getUploadDir() const { return upload_dir; }
 std::map<int, std::string> Config::Location::getReturn() const { return return_; }
 std::string Config::Location::getPath() const { return path; }
+std::string Config::Location::getOldPath() const { return old_path; }
 void Config::addLocation(const Location &location) { locations.push_back(location); }
 std::vector<Config::Location> Config::getLocations() const { return locations; }
 std::vector<Config> Config::getConfigs() const { return configs; }

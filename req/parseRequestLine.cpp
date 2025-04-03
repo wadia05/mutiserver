@@ -97,7 +97,12 @@ bool HTTPRequest::parseRequestLine(const std::string &line, const Config &config
             size_t pos = it->getPath().find(dir);
             if (pos != std::string::npos)
             {
-                new_path = it->getPath() + file;
+                std::string old_path = it->getOldPath();
+                std::string path = it->getPath();
+                std::string new_dir = "/" + dir + "/";
+                if ( old_path!= new_dir)
+                    continue;
+                new_path = path + file;
                 break;
             }
         }
@@ -125,6 +130,14 @@ bool HTTPRequest::parseRequestLine(const std::string &line, const Config &config
         if (location.getPath().empty())
             return (print_message("Path not found in locations: " + dir, RED), status = 404, false);
         this->in_location = dir;
+        std::map<int, std::string> redirection = location.getReturn();
+        if (!redirection.empty())
+        {
+            this->is_redirect = true;
+            this->status = redirection.begin()->first;
+            this->location_redirect = redirection.begin()->second;
+            return true;
+        }
         path = new_path;
         std::vector<std::string> methods = location.getAllowMethods();
         if (!methods.empty() && std::find(methods.begin(), methods.end(), method) == methods.end())
@@ -136,6 +149,14 @@ bool HTTPRequest::parseRequestLine(const std::string &line, const Config &config
         if (location.getPath().empty())
             return (print_message("Path not found in locations: " + new_path, RED), status = 404, false);
         this->in_location = new_path;
+        std::map<int, std::string> redirection = location.getReturn();
+        if (!redirection.empty())
+        {
+            this->is_redirect = true;
+            this->status = redirection.begin()->first;
+            this->location_redirect = redirection.begin()->second;
+            return true;
+        }
         std::vector<std::string> index = location.getIndex();
         if (index.empty())
             index = config.getDefaultIndex();

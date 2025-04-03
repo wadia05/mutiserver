@@ -1,6 +1,6 @@
 #include "connectionHandeling.hpp"
 
-Connection::Connection(int fd) : fd(fd), status_code(200), read_buffer(""), write_buffer(""), response(""), path(""), readFormFile(NULL), query(""), upload_path(""), method(NOTDETECTED),
+Connection::Connection(int fd) : fd(fd), status_code(200),is_redection(false) , read_buffer(""), write_buffer(""), response(""), path(""), readFormFile(NULL), query(""), upload_path(""), method(NOTDETECTED),
                                  last_active(time(NULL)), content_length(0), total_sent(0),total_received(0), keep_alive(true), headersSend(false), chunked(false),
                                     state(IDLE), is_cgi(false)
 {
@@ -107,6 +107,13 @@ std::string Connection::GetHeaderResponse()
     // Build HTTP response header
     std::stringstream ss;
     ss << "HTTP/1.1 " << this->status_code << " " << GetStatusMessage() << "\r\n";
+    if (this->is_redection == true)
+    {
+        ss << "Location: " <<  this->response << "\r\n";
+        this->is_redection = false;
+        this->response.clear();
+
+    }
     ss << "Content-Type: " << contentType << "\r\n";
     ss << "Content-Length: " << (this->is_cgi ? this->response.size() : this->content_length) << "\r\n";
     ss << "Server: MoleServer\r\n";
@@ -153,6 +160,8 @@ std::string Connection::GetStatusMessage()
         return "Forbidden";
     case 404:
         return "Not Found";
+    case 302:
+        return "Found";
     case 500:
         return "Internal Server Error";
     default:
@@ -185,7 +194,7 @@ void Connection::GetStateFilePath()
             this->path = "www/error_pages/400.html";
             break;
         case 403:
-            this->path = "wwww/error_pages/403.html";
+            this->path = "www/error_pages/403.html";
             break;
         case 404:
             this->path = "www/error_pages/404.html";
@@ -200,10 +209,11 @@ void Connection::GetStateFilePath()
     }
 
     this->readFormFile->open(this->path.c_str(), std::ios::in | std::ios::binary);
+    std::cout << "Path: " << this->path << std::endl;
     if (!this->readFormFile->is_open())
     {
         std::cerr << "Failed to open file" << std::endl;
-        this->path = "www/error.html";
+        this->path = "www/error_pages/default.html";
         this->readFormFile->open(this->path.c_str(), std::ios::in | std::ios::binary);
         if (!this->readFormFile->is_open())
         {

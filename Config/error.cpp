@@ -142,30 +142,28 @@ bool Config::validpathlocation(std::vector<Config::Location> &locations, std::st
         }
         std::string root;
         if (it->getRoot().empty())
-        {
             root = default_root;
-        }
         else
-        {
             root = it->getRoot()[0];
-        }
-
         std::string path = it->getPath();
-        if (root[root.size() - 1] != '/')
-            root += "/";
+        it->setOldPath(path);
         if (path == "/")
             path = "";
         if (!path.empty() && path[0] == '/')
             path = path.substr(1);
-
         std::string full_path = root + path;
-        int i = 0;
+        int i = 2;
         if (!isValidPath(full_path, true))
         {
             print_message("Error: Invalid path in location block - '" + full_path + "' does not exist or is inaccessible", RED);
             return false;
         }
         it->setPath(full_path, &i);
+        if (i == 1)
+        {
+            print_message("Error: Invalid path in location blockk", RED);
+            return false;
+        }
     }
 
     std::vector<Config::Location> temp_locations = locations;
