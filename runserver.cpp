@@ -61,11 +61,11 @@ void test_dir(std::string path)
     {
         if (entry->d_type == DT_DIR)
         {
-            htmlFile << "<a href=\"" << entry->d_name << "\">" << entry->d_name << "</a><br>\n";
+            htmlFile << "<a href=\"" << path + entry->d_name << "\">" << entry->d_name << "</a><br>\n";
         }
         else if (entry->d_type == DT_REG)
         {
-            htmlFile << "<a href=\"" << entry->d_name << "\">" << entry->d_name << "</a><br>\n";
+            htmlFile << "<a href=\"" << path + entry->d_name << "\">" << entry->d_name << "</a><br>\n";
         }
     }
 
@@ -137,12 +137,14 @@ bool Run::handleConnection(int fd, int j)
 }
 void Run::readRequest(Connection *conn)
 {
-    if (conn->fd == 0) {
+    if (conn->fd <= 0) {
         std::cerr << "No socket available" << std::endl;
+         conn->state = Connection::CLOSING;
         return;
     }
     if (!conn){
         std::cerr << "Connection object is NULL" << std::endl;
+         conn->state = Connection::CLOSING;
         return;
     }
     char buffer[BUFFER_SIZE];
@@ -152,18 +154,20 @@ void Run::readRequest(Connection *conn)
     // Check for EAGAIN or EWOULDBLOCK
     if (read_bytes < 0) {
         std::cerr << "Failed to read request" << std::endl;
-        close_connection(conn);
+         conn->state = Connection::CLOSING;
+        // close_connection(conn);
         return;
     }
 
     if (read_bytes == 0) {
         std::cerr << "Client disconnected" << std::endl;
-        close_connection(conn);
+         conn->state = Connection::CLOSING;
+        // close_connection(conn);
         return;
     }
 
     conn->read_buffer.append(buffer, read_bytes);
-    conn->last_active = time(0);
+    // conn->last_active = time(0);
 
     if (conn->total_received == 0) {
         const std::string content_length_header = "Content-Length: ";
@@ -286,26 +290,43 @@ void Run::parseRequest(Connection *conn)
     setReqType(conn, request);
     possessRequest(conn, request);
     // request.print_all();
-    conn->last_active = time(0);
+    // conn->last_active = time(0);
     // conn->state = Connection::WRITING;
 }
 void Run::handleRequest(Connection *conn)
 {
-    if (conn->state == Connection::READING)
+    if (!conn)
+    {
+        std::cerr << "Connection object is NULL" << std::endl;
+        return;
+    }
+    if ( conn->state == Connection::CLOSING)
+    {
+        std::cout << "Connection is closing by state close" << std::endl;
+        close_connection(conn);
+        return;
+    }
+    else if (conn->state == Connection::READING)
     {
         this->readRequest(conn);
-        conn->last_active = time(0);
-        // std::cout << "Read request: " << conn->read_buffer << std::endl;
+        // Connection might be closed in readRequest, check before continuing
+        // if (conn->fd <= 0) return;
     }
     else if (conn->state == Connection::POSSESSING)
     {
-        // exit(1);
         this->parseRequest(conn);
+        // Connection might be closed in parseRequest, check before continuing
+        // if (conn->fd <= 0) return;
     }
     else if (conn->state == Connection::WRITING)
     {
         this->sendResponse(conn);
+        // Don't do anything after sendResponse since the connection might be closed
+        // return;
     }
+    
+    // Update the last active time only if we still have a valid connection
+    conn->last_active = time(0);
 }
 void Run::runServer()
 {
@@ -331,45 +352,53 @@ void Run::runServer()
                     print_message("Waiting for events...", YELLOW);
                     if (this->handleConnection(current_fd, j) == false)
                         continue;
+                    break;
                 }
                 else
                 {
+
                     std::map<int, Connection *>::iterator it = this->connections[j].find(current_fd);
                     if (it != this->connections[j].end())
                     {
                         // print_message("Connection found", GREEN);
                         // std::cout << "test2 " << it->second->fd << std::endl;
                         handleRequest(it->second);
+
+                        break;
                     }
                
                 }
+                // std::cout << "last activety" << connections[j].find(current_fd)->second->last_active << std::endl;
+  
             }
-              // Handle keep-alive timeouts safely
-            time_t current_time = time(0);
-            // std::cout << "Current time: " << current_time << std::endl;
-            std::vector<int> expired_fds;
-            std::map<int, Connection *>::iterator it;
-            for (it = this->connections[this->currIndexServer].begin(); it != this->connections[this->currIndexServer].end(); ++it)
-            {
-                // std::cout << "Checking connection: " << it->first << " with last active: " << it->second->last_active << std::endl;
-                if (current_time - it->second->last_active > KEEP_ALIVE_TIMEOUT)
-                {
-                    expired_fds.push_back(it->first);
-                }
-            }
-
-
-            for (size_t i = 0; i < expired_fds.size(); ++i)
-            {
-                std::map<int, Connection *>::iterator it = this->connections[this->currIndexServer].find(expired_fds[i]);
-                if (it != this->connections[this->currIndexServer].end())
-                {
-                    // std::cout << "from timeout : " << it->first << std::endl;
-                    close_connection(it->second);
-                }
-            }
+            
 
         }
+            time_t current_time = time(0);
+            for (size_t j = 0; j < servers.size(); j++) {
+                std::vector<int> expired_fds;
+                
+                // First, collect all expired connections
+                for (std::map<int, Connection*>::iterator it = this->connections[j].begin(); 
+                    it != this->connections[j].end(); ++it) {
+                    if (current_time - it->second->last_active > KEEP_ALIVE_TIMEOUT) {
+                        expired_fds.push_back(it->first);
+                        std::cout << "Found expired connection " << it->first 
+                                << " (inactive for " << current_time - it->second->last_active 
+                                << " seconds)" << std::endl;
+                    }
+                }
+                
+                // Then close them
+                for (size_t i = 0; i < expired_fds.size(); ++i) {
+                    std::map<int, Connection*>::iterator it = this->connections[j].find(expired_fds[i]);
+                    if (it != this->connections[j].end()) {
+                        std::cout << "Closing expired connection " << it->first << " on server " << j << std::endl;
+                        Connection* conn = it->second;
+                        close_connection(conn); // This will also erase from the map
+                    }
+                }
+            }
         
     }
 }
@@ -476,6 +505,11 @@ void resetClient(Connection *conn)
 
 void Run::sendResponse(Connection *conn)
 {
+    if (conn->fd <= 0) {
+        std::cerr << "No socket available" << std::endl;
+        conn->state = Connection::CLOSING;
+        return;
+    }
     if (!conn->headersSend) {
         conn->write_buffer = conn->GetHeaderResponse();
         conn->headersSend = true;
@@ -483,8 +517,7 @@ void Run::sendResponse(Connection *conn)
     }
 
     if (!conn->readFormFile->is_open() && !conn->is_cgi) {
-        std::cerr << "No file to send" << std::endl;
-        close_connection(conn);
+        conn->state = Connection::CLOSING;
         return;
     }
 
@@ -502,7 +535,7 @@ void Run::sendResponse(Connection *conn)
 
     ssize_t sent = send(conn->fd, conn->write_buffer.c_str(), conn->write_buffer.size(), MSG_NOSIGNAL);
     if (sent < 0) {
-        close_connection(conn);
+        conn->state = Connection::CLOSING;
         return;
     }
 
@@ -518,7 +551,9 @@ void Run::sendResponse(Connection *conn)
         conn->state = Connection::WRITING;
         if (conn->keep_alive == false)
         {
-            close_connection(conn);
+            std::cout << "close by keep alive   " << std::endl;
+            conn->state = Connection::CLOSING;
+            // close_connection(conn);
         }
         else
         {
@@ -529,32 +564,29 @@ void Run::sendResponse(Connection *conn)
         mod_epoll(conn->fd, EPOLLOUT);
     }
 }
-
 void Run::close_connection(Connection *conn)
 {
     if (!conn)
         return;
-    // resetClient(conn);
+    
     int fd = conn->fd;
+    int active = time(0) - conn->last_active;
+    std::cout << "Connection closed after " << active << " seconds" << std::endl;
+    // Set fd to an invalid value so other parts know it's been closed
+    conn->fd = -1; 
+    
     std::cout << "Closing connection: " << fd << std::endl;
-    // Remove from monitoring first
     remove_from_epoll(fd);
-
-    // this->ready_fds.erase(std::remove(this->ready_fds.begin(), this->ready_fds.end(), fd), this->ready_fds.end());
-    // Close socket
     close(fd);
-
+    
     // Remove from connections map BEFORE deletion
     for (size_t i = 0; i < servers.size(); i++)
     {
         this->connections[i].erase(fd);
     }
     
-    // Delete connection object
     delete conn;
-    conn = NULL;
 }
-
 
 
 // << =================== Methods for Server =================== >> //
